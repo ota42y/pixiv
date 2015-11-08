@@ -57,6 +57,9 @@ module Pixiv
     # @return [Integer]
     lazy_attr_reader(:score) { at!('.score-count').inner_text.to_i }
 
+    # @return [Time]
+    lazy_attr_reader(:upload_at) { get_upload_at }
+
     # @return [Boolean]
     lazy_attr_reader(:mypixiv_only?) { doc.at('[@class="_no-item closed"]').nil?.! }
 
@@ -73,6 +76,14 @@ module Pixiv
     def manga?; !!num_pages end
 
     private
+
+    def get_upload_at
+      metadatas = at!('.meta li')
+      metadatas.children.each do |data|
+        return Time.strptime(data.content, "%Y年%m月%d日 %H:%M") if data.content.index "年"
+      end
+      nil
+    end
 
     def image_url_components
       @image_url_components ||= medium_image_url.match(%r{^(.+)_m(\.\w+(?:\?\d+)?)$}).to_a[1, 3]
