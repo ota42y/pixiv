@@ -1,5 +1,8 @@
 module Pixiv
   class Client
+    LOGIN_PAGE_URL = 'https://accounts.pixiv.net/login?lang=ja'
+    LOGIN_API_URL = 'https://accounts.pixiv.net/api/login?lang=ja'
+
     # A new agent
     # @return [Mechanize::HTTP::Agent]
     def self.new_agent
@@ -37,17 +40,43 @@ module Pixiv
       end
     end
 
+    # Header for login request
+    def login_header
+      headers = {}
+      headers["Accept-Encoding"] = "deflate,gzip"
+      headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
+      headers["Referer"] = "https://accounts.pixiv.net/login"
+      headers["Origin"] = "https://accounts.pixiv.net"
+      headers["X-Requested-With"] = "XMLHttpRequest"
+      headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+
+      headers
+    end
+
+    # Post Parameter for login request
+    def login_params(pixiv_id, password, post_key)
+      params = {captcha: "", g_recaptcha_response:"", source: "accounts"}
+      params = params.merge({pixiv_id: pixiv_id, password: password, post_key: post_key})
+
+      URI.encode_www_form(params)
+    end
+
     # Log in to Pixiv
     # @param [String] pixiv_id
     # @param [String] password
     def login(pixiv_id, password)
-      doc = agent.get("#{ROOT_URL}/index.php")
-      return if doc && doc.body =~ /logout/
-      form = doc.forms_with(action: 'https://www.secure.pixiv.net/login.php').first
-      puts doc.body and raise Error::LoginFailed, 'login form is not available' unless form
-      form.pixiv_id = pixiv_id
-      form.pass = password
-      doc = agent.submit(form)
+      doc = agent.get(LOGIN_PAGE_URL)
+      config_json = JSON.load(doc.at("#init-config").attr("value"))
+      raise Error::LoginFailed, '#init-config not found' unless config_json
+      post_key = config_json["pixivAccount.postKey"]
+      raise Error::LoginFailed, 'pixivAccount.postKey not fount' unless post_key
+
+      doc = agent.post(LOGIN_API_URL, login_params(pixiv_id, password, post_key), login_header)
+      login_json = JSON.load(doc.body)
+      raise Error::LoginFailed, 'login failed' unless login_json
+      return_url= login_json["body"]["successed"]["return_to"]
+
+      doc = agent.get(return_url)
       raise Error::LoginFailed unless doc && doc.body =~ /logout/
       @member_id = member_id_from_mypage(doc)
     end
