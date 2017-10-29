@@ -24,7 +24,16 @@ module Pixiv
               : (0...num_pages).map {|n| image_url_components.join("_p#{n}") }
     }
     # @return [String]
-    lazy_attr_reader(:original_image_referer) { ROOT_URL + '/' + at!('//div[@class="works_display"]/a')['href'] }
+    lazy_attr_reader(:original_image_referer) {
+      node = doc.at('._work.manga')
+      node = doc.at('._work.multiple') unless node
+      if node
+        ROOT_URL + '/' + node['href']
+      else
+        url
+      end
+    }
+
     # @return [Integer]
     lazy_attr_reader(:illust_id) { at!('#rpc_i_id')['title'].to_i }
     # @return [Integer]
