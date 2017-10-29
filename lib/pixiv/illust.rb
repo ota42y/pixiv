@@ -17,7 +17,19 @@ module Pixiv
     # @return [String]
     lazy_attr_reader(:medium_image_url) { at!('.works_display img')['src'] }
     # @return [String]
-    lazy_attr_reader(:original_image_url) { illust? ? image_url_components[0] + 'img-original/img/' + image_url_components[1] + '0' + image_url_components[2] : nil }
+    lazy_attr_reader(:original_image_url) do
+      if illust?
+        original_image = doc.at(".original-image")
+        if original_image
+          original_image.attribute("data-src").value
+        else
+          doc.at("._layout-thumbnail.ui-modal-trigger").children.at('img')['src']
+        end
+      else
+        nil
+      end
+    end
+
     # @return [Array<String>]
     lazy_attr_reader(:original_image_urls) {
       illust? ? [original_image_url]
